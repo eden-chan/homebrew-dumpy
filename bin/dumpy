@@ -1,9 +1,20 @@
 #!/usr/bin/env bun
 
-import { appendFile } from "node:fs/promises"
+/// <reference types="bun-types" />
+/// <reference types="@types/node" />
 
-const NOTES_FILE = './thoughts.jsonl'
+import { appendFile } from "node:fs/promises"
+import { homedir } from "node:os"
+import { join } from "node:path"
+import { mkdir } from "node:fs/promises"
+
+const STORAGE_DIR = join(homedir(), '.dumpy')
+const NOTES_FILE = join(STORAGE_DIR, 'thoughts.jsonl')
 const TEMP_FILE = `/tmp/dumpy.txt`
+const DEFAULT_TIMER = 0 // in seconds, 0 means no timer
+
+// Create storage directory if it doesn't exist
+await mkdir(STORAGE_DIR, { recursive: true })
 
 // make sure we can write to NOTES_FILE without overwriting
 try {
@@ -15,11 +26,22 @@ try {
 await Bun.write(TEMP_FILE, '')
 
 try {
+  const timer = process.argv[2] ? parseInt(process.argv[2]) : DEFAULT_TIMER
+  let timerProc
+
   const proc = Bun.spawn(['vim', '+startinsert', TEMP_FILE], { 
     stdio: ['inherit', 'inherit', 'inherit']
   })
   
+  if (timer > 0) {
+    timerProc = setTimeout(() => {
+      proc.kill()
+    }, timer * 1000)
+  }
+  
   await proc.exited
+  
+  if (timerProc) clearTimeout(timerProc)
   
   const thought = await Bun.file(TEMP_FILE).text()
   

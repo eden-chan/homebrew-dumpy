@@ -23,5 +23,9 @@
   "bugs": {
     "url": "https://github.com/eden-chan/homebrew-dumpy/issues"
   },
-  "homepage": "https://github.com/eden-chan/homebrew-dumpy#readme"
+  "homepage": "https://github.com/eden-chan/homebrew-dumpy#readme",
+  "devDependencies": {
+    "@types/node": "^22.9.1",
+    "bun-types": "^1.1.35"
+  }
 }
