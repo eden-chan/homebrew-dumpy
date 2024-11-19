@@ -2,8 +2,7 @@ class Dumpy < Formula
   desc "Quick terminal journaling tool"
   homepage "https://github.com/eden-chan/homebrew-dumpy"
   url "https://github.com/eden-chan/homebrew-dumpy/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" # Temporary SHA, will update after release
-  
+  sha256 "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed"  
   depends_on "bun"
 
   def install
