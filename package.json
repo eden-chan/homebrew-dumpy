@@ -1,0 +1,27 @@
+{
+  "name": "dumpy",
+  "version": "0.1.0",
+  "description": "A quick terminal journaling tool",
+  "bin": {
+    "dumpy": "./bin/dumpy"
+  },
+  "dependencies": {
+    "bun": "^1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eden-chan/homebrew-dumpy.git"
+  },
+  "keywords": [
+    "journal",
+    "cli",
+    "notes",
+    "homebrew"
+  ],
+  "author": "Eden Chan",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/eden-chan/homebrew-dumpy/issues"
+  },
+  "homepage": "https://github.com/eden-chan/homebrew-dumpy#readme"
+}

@@ -1,0 +1,39 @@
+#!/usr/bin/env bun
+
+import { appendFile } from "node:fs/promises"
+
+const NOTES_FILE = './thoughts.jsonl'
+const TEMP_FILE = `/tmp/dumpy.txt`
+
+// make sure we can write to NOTES_FILE without overwriting
+try {
+  await Bun.file(NOTES_FILE).text()
+} catch {
+  await Bun.write(NOTES_FILE, '')
+}
+
+await Bun.write(TEMP_FILE, '')
+
+try {
+  const proc = Bun.spawn(['vim', '+startinsert', TEMP_FILE], { 
+    stdio: ['inherit', 'inherit', 'inherit']
+  })
+  
+  await proc.exited
+  
+  const thought = await Bun.file(TEMP_FILE).text()
+  
+  if (thought.trim()) {
+    const entry = {
+      text: thought.trim(),
+      timestamp: new Date().toISOString()
+    }
+    
+    await appendFile(NOTES_FILE, JSON.stringify(entry) + '\n')
+    
+    const notes = await Bun.file(NOTES_FILE).text()
+    console.log('dumped!\n', notes)
+  }
+} catch (e) {
+    console.error('cancelled, ', e)
+}
