@@ -7,11 +7,13 @@ import { appendFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { mkdir } from "node:fs/promises"
+import { spawn } from "child_process";
+import { unlinkSync } from "fs";
 
 const STORAGE_DIR = join(homedir(), '.dumpy')
-const NOTES_FILE = join(STORAGE_DIR, 'thoughts.jsonl')
+const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
 const TEMP_FILE = `/tmp/dumpy.txt`
-const DEFAULT_TIMER = 0 // in seconds, 0 means no timer
+const DEFAULT_TIMER = 60 // 1 minute
 
 // Create storage directory if it doesn't exist
 await mkdir(STORAGE_DIR, { recursive: true })
@@ -27,35 +29,53 @@ await Bun.write(TEMP_FILE, '')
 
 try {
   const timer = process.argv[2] ? parseInt(process.argv[2]) : DEFAULT_TIMER
-  let timerProc
 
-  const proc = Bun.spawn(['vim', '+startinsert', TEMP_FILE], { 
-    stdio: ['inherit', 'inherit', 'inherit']
-  })
-  
-  if (timer > 0) {
-    timerProc = setTimeout(() => {
-      proc.kill()
-    }, timer * 1000)
+  if (timer > 0 && process.platform === "darwin") {
+    setTimeout(() => {
+      spawn("osascript", ["-e", 'display notification "Time is almost up!" with title "Dumpy Timer"'])
+    }, (timer - 1) * 1000)
   }
-  
-  await proc.exited
-  
-  if (timerProc) clearTimeout(timerProc)
-  
-  const thought = await Bun.file(TEMP_FILE).text()
-  
-  if (thought.trim()) {
-    const entry = {
-      text: thought.trim(),
-      timestamp: new Date().toISOString()
+
+  // Before starting vim, clean up any existing swap files
+  try {
+    unlinkSync("/tmp/.dumpy.txt.swp");
+  } catch {}
+
+
+  const vimProcess = spawn('vim', [
+    '-n',                     // No swap file
+    '+startinsert',          // Start in insert mode
+    '-c', `autocmd VimEnter * let timer = timer_start(${timer * 1000}, {-> execute(':wq')})`, // Auto save-quit after timer
+    TEMP_FILE
+  ], {
+    stdio: 'inherit'
+  })
+
+  // Wait for vim to exit
+  const exitCode = await new Promise((resolve) => {
+    vimProcess.on('exit', (code) => {
+      try {
+        unlinkSync("/tmp/.dumpy.txt.swp");
+      } catch {}
+      resolve(code);
+    });
+  })
+
+  if (exitCode === 0 || exitCode === null) {
+    const thought = await Bun.file(TEMP_FILE).text()
+    
+    if (thought.trim()) {
+      const entry = {
+        text: thought.trim(),
+        timestamp: new Date().toISOString()
+      }
+      
+      await appendFile(NOTES_FILE, JSON.stringify(entry) + '\n')
+      console.log('dumped!')
     }
-    
-    await appendFile(NOTES_FILE, JSON.stringify(entry) + '\n')
-    
-    const notes = await Bun.file(NOTES_FILE).text()
-    console.log('dumped!\n', notes)
   }
 } catch (e) {
     console.error('cancelled, ', e)
+} finally {
+    await Bun.write(TEMP_FILE, '')
 }
