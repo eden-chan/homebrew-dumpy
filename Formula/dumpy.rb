@@ -9,15 +9,12 @@ class Dumpy < Formula
   def install
     bin.mkpath
     bin.install "bin/dumpy"
-    bin.install Dir["bin/*.dumpy"]
-    
-    # Make everything executable
-    chmod 0755, Dir[bin/"*.dumpy"]
-    chmod 0755, bin/"dumpy"
+    bin.install Dir["bin/dumpy-*"]
+    # Set permissions for all executables
+    chmod 0755, Dir[bin/"dumpy*"]
   end
 
   test do
-    assert_match "dumpy", shell_output("#{bin}/dumpy --version")
+    assert_match "Usage: dumpy", shell_output("#{bin}/dumpy --help")
   end
 end
-
