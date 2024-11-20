@@ -1,0 +1,73 @@
+#!/usr/bin/env bun
+
+/// <reference types="bun-types" />
+
+import { readFileSync } from "fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { format } from 'date-fns';
+
+type DumpyEntry = {
+  text: string;
+  timestamp: string;
+}
+
+const STORAGE_DIR = join(homedir(), '.dumpy')
+const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
+
+const HELP_TEXT = `
+Usage: dumpy read [options]
+
+Options:
+  number     Number of entries to show (default: all)
+  -h, --help Show this help message
+
+Examples:
+  dumpy read      Show all entries
+  dumpy read 5    Show last 5 entries
+  dumpy read -h   Show this help
+`
+
+function printHelp() {
+  console.log(HELP_TEXT)
+  process.exit(0)
+}
+
+// Parse args
+const args = process.argv.slice(2)
+let limit: number | undefined
+
+if (args.length > 0) {
+  if (args[0] === '-h' || args[0] === '--help') {
+    printHelp()
+  }
+  limit = Number(args[0])
+  if (isNaN(limit)) {
+    console.error('Error: Argument must be a number')
+    process.exit(1)
+  }
+}
+
+// Read and display entries
+try {
+  const entries = readFileSync(NOTES_FILE, 'utf-8')
+    .trim()
+    .split('\n')
+    .map(line => JSON.parse(line) as DumpyEntry)
+    .slice(limit ? -limit : 0);
+
+  if (entries.length === 0) {
+    console.log('No entries found')
+    process.exit(0)
+  }
+
+  entries.forEach(entry => {
+    const date = format(new Date(entry.timestamp), 'MMM d, h:mm a');
+    console.log(`\n[${date}]`);
+    console.log(entry.text);
+  });
+
+} catch (e) {
+  console.error('Error reading history:', e)
+  process.exit(1)
+} 

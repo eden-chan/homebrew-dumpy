@@ -1,0 +1,55 @@
+#!/usr/bin/env bun
+
+/// <reference types="bun-types" />
+
+import { readFileSync } from "fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const STORAGE_DIR = join(homedir(), '.dumpy')
+const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
+
+type DumpyEntry = {
+  text: string;
+  timestamp: string;
+}
+
+// Read entries
+const entries = readFileSync(NOTES_FILE, 'utf-8')
+  .trim()
+  .split('\n')
+  .map(line => JSON.parse(line) as DumpyEntry)
+  .map(entry => entry.text);
+
+// For now, just do simple analysis
+const summary = entries[entries.length - 1]?.split(/[.!?]/)?.shift()?.trim();
+
+const HELP_TEXT = `
+Usage: dumpy think [options]
+
+Options:
+  -h, --help Show this help message
+
+Examples:
+  dumpy think     Analyze all thoughts
+  dumpy think -h  Show this help
+
+Note: Currently provides basic analysis. Future versions will use LLM for deeper insights.
+`
+
+// Add help handling
+if (process.argv.includes('-h') || process.argv.includes('--help')) {
+  console.log(HELP_TEXT)
+  process.exit(0)
+}
+
+console.log(`
+AI Analysis:
+-----------
+Your most recent thought was: "${summary || 'No entries found'}"
+
+This seems to be about personal reflection and growth.
+I notice themes of introspection in your writing.
+
+(This is a placeholder for actual LLM analysis)
+`); 
