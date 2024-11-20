@@ -13,3 +13,4 @@ class Dumpy < Formula
     system "#{bin}/dumpy", "--version"
   end
 end
+

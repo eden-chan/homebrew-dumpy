@@ -6,7 +6,8 @@
     "dumpy": "./bin/dumpy"
   },
   "dependencies": {
-    "bun": "^1.0.0"
+    "bun": "^1.0.0",
+    "date-fns": "^4.1.0"
   },
   "repository": {
     "type": "git",
