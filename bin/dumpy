@@ -82,8 +82,6 @@ async function pipeCommands(commands: string[], options: PipeOptions = {}): Prom
   })
   
   const output = await new Response(proc.stdout).text()
-  console.log(`piping commands: ${cmdString} output: ${output}`)
-
   return output
 }
 
@@ -107,14 +105,12 @@ async function main() {
   // Handle piping for think command
   if (cmd === 'think' || cmd === 't') {
     try {
-      console.log('reading...')
-      console.log('thinking...')
       const output = await pipeCommands(['read', 'think'], { args })
-
-      // Use Response as stdin.
-      await $`echo ${output} | glow -`
-
-      
+      const glowProc = Bun.spawn(['glow', '-'], {
+        stdin: new TextEncoder().encode(output),
+        stdout: 'inherit'
+      })
+      await glowProc.exited
       process.exit(0)
     } catch (e) {
       console.error('Error:', e)
