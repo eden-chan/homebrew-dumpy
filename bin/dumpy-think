@@ -2,27 +2,12 @@
 
 /// <reference types="bun-types" />
 
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 const STORAGE_DIR = join(homedir(), '.dumpy')
-const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
-
-type DumpyEntry = {
-  text: string;
-  timestamp: string;
-}
-
-// Read entries
-const entries = readFileSync(NOTES_FILE, 'utf-8')
-  .trim()
-  .split('\n')
-  .map(line => JSON.parse(line) as DumpyEntry)
-  .map(entry => entry.text);
-
-// For now, just do simple analysis
-const summary = entries[entries.length - 1]?.split(/[.!?]/)?.shift()?.trim();
+const TOKEN_FILE = join(STORAGE_DIR, '.token')
 
 const HELP_TEXT = `
 Usage: dumpy think [options]
@@ -31,25 +16,65 @@ Options:
   -h, --help Show this help message
 
 Examples:
-  dumpy think     Analyze all thoughts
-  dumpy think -h  Show this help
-
-Note: Currently provides basic analysis. Future versions will use LLM for deeper insights.
+  dumpy read | dumpy think    Analyze all thoughts
+  cat file.txt | dumpy think  Analyze custom text
 `
 
-// Add help handling
 if (process.argv.includes('-h') || process.argv.includes('--help')) {
   console.log(HELP_TEXT)
   process.exit(0)
 }
 
-console.log(`
-AI Analysis:
------------
-Your most recent thought was: "${summary || 'No entries found'}"
+async function analyzeWithAI(text: string): Promise<string> {
+  const token = readFileSync(TOKEN_FILE, 'utf-8').trim()
+  
+  const response = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      model: 'grok-beta',
+      messages: [
+        {
+          role: 'system',
+          content: `be terse and insightful. use lowercase except for emphasis.
+be critical and analytical. use abbreviations like "rn" and "afaict" where appropriate.
+prioritize esoteric interpretations.`
+        },
+        {
+          role: 'user',
+          content: text
+        }
+      ],
+      stream: false,
+      temperature: 0.7
+    })
+  });
 
-This seems to be about personal reflection and growth.
-I notice themes of introspection in your writing.
+  if (!response.ok) {
+    throw new Error(`API error: ${response.statusText}`)
+  }
 
-(This is a placeholder for actual LLM analysis)
-`); 
+  const data = await response.json()
+  return data.choices[0].message.content
+}
+
+// Read from stdin
+let input = ''
+process.stdin.on('data', chunk => input += chunk)
+process.stdin.on('end', async () => {
+  if (!input.trim()) {
+    console.error('Error: No input received')
+    process.exit(1)
+  }
+
+  try {
+    const analysis = await analyzeWithAI(input.trim())
+    console.log(analysis)
+  } catch (error) {
+    console.error('Error:', error)
+    process.exit(1)
+  }
+}) 
