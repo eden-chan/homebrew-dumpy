@@ -15,18 +15,21 @@ type DumpyEntry = {
 const STORAGE_DIR = join(homedir(), '.dumpy')
 const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
 
-function printHelp() {
-  console.log(`
-Usage: dumpy-history [number]
+const HELP_TEXT = `
+Usage: dumpy read [options]
 
 Options:
   number     Number of entries to show (default: all)
   -h, --help Show this help message
 
 Examples:
-  dumpy-history    Show all entries
-  dumpy-history 5  Show last 5 entries
-`)
+  dumpy read      Show all entries
+  dumpy read 5    Show last 5 entries
+  dumpy read -h   Show this help
+`
+
+function printHelp() {
+  console.log(HELP_TEXT)
   process.exit(0)
 }
 

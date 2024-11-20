@@ -34,16 +34,16 @@ const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
 const TEMP_FILE = `/tmp/dumpy.txt`
 const DEFAULT_TIMER = 60
 const HELP_TEXT = `
-Usage: dumpy-dump [timer]
+Usage: dumpy write [options]
 
 Options:
   timer      Duration in seconds before auto-save (default: 60)
   -h, --help Show this help message
 
 Examples:
-  dumpy-dump    Start with default 60s timer
-  dumpy-dump 30 Start with 30s timer
-  dumpy-dump 0  Start with no timer
+  dumpy write      Start with default 60s timer
+  dumpy write 30   Start with 30s timer
+  dumpy write 0    Start with no timer
 `
 
 // Helper functions

@@ -24,6 +24,25 @@ const entries = readFileSync(NOTES_FILE, 'utf-8')
 // For now, just do simple analysis
 const summary = entries[entries.length - 1]?.split(/[.!?]/)?.shift()?.trim();
 
+const HELP_TEXT = `
+Usage: dumpy think [options]
+
+Options:
+  -h, --help Show this help message
+
+Examples:
+  dumpy think     Analyze all thoughts
+  dumpy think -h  Show this help
+
+Note: Currently provides basic analysis. Future versions will use LLM for deeper insights.
+`
+
+// Add help handling
+if (process.argv.includes('-h') || process.argv.includes('--help')) {
+  console.log(HELP_TEXT)
+  process.exit(0)
+}
+
 console.log(`
 AI Analysis:
 -----------

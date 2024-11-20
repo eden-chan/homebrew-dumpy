@@ -1,158 +1,83 @@
 #!/usr/bin/env bun
 
 /// <reference types="bun-types" />
-/// <reference types="@types/node" />
 
-import { appendFile } from "node:fs/promises"
-import { homedir } from "node:os"
-import { join } from "node:path"
-import { mkdir } from "node:fs/promises"
-import { spawn } from "child_process";
-import { unlinkSync } from "fs";
+import { spawn } from "child_process"
+import { join } from "path"
 
-const STORAGE_DIR = join(homedir(), '.dumpy')
-const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
-const TEMP_FILE = `/tmp/dumpy.txt`
-const DEFAULT_TIMER = 60 // 1 minute
-const DEFAULT_HISTORY_COUNT = 3
+const HELP_TEXT = `
+Usage: dumpy <command> [options]
 
-
-type Args = {
-  timer: number;
-  history: number;
-}
-
-function printHelp() {
-  console.log(`
-Usage: dumpy [options] or dumpy <seconds>
-
-Options:
-  -t, --timer <seconds>   Set timer duration (default: ${DEFAULT_TIMER}s)
-  -n, --history <number>  Number of history entries to show (default: 1)
-  -h, --help             Show this help message
+Commands:
+  write, w   Write a new thought (dumpy-dump)
+  read, r    Read your thoughts (dumpy-history)
+  think, t   Get insights about your thoughts (dumpy-insight)
 
 Examples:
-  dumpy                  Start with default 60s timer
-  dumpy 30              Start with 30s timer
-  dumpy -t 30           Start with 30s timer
-  dumpy --timer 120     Start with 2min timer
-  dumpy -n 5            Show last 5 history entries
-`)
-  process.exit(0)
-}
+  dumpy write 30    Write with 30s timer
+  dumpy read 5      Read last 5 entries
+  dumpy think       Analyze your thoughts
+`
 
-function parseArgs(): Args {
-  const args = process.argv.slice(2)
-  let timer = DEFAULT_TIMER
-  let history = DEFAULT_HISTORY_COUNT
-
-  if (args.length === 0) return { timer, history }
-
-  // If first arg is a number, treat it as timer value
-  if (!isNaN(Number(args[0]))) {
-    timer = Number(args[0])
-    return { timer, history }
-  }
-
-  for (let i = 0; i < args.length; i++) {
-    switch (args[i]) {
-      case '-h':
-      case '--help':
-        printHelp()
-        break
-      case '-t':
-      case '--timer':
-        const tValue = args[++i]
-        if (!tValue || isNaN(Number(tValue))) {
-          console.error('Error: Timer value must be a number in seconds')
-          printHelp()
-        }
-        timer = Number(tValue)
-        break
-      case '-n':
-      case '--history':
-        const hValue = args[++i]
-        if (!hValue || isNaN(Number(hValue))) {
-          console.error('Error: History value must be a number')
-          printHelp()
-        }
-        history = Number(hValue)
-        break
-      default:
-        console.error(`Error: Unknown option ${args[i]}`)
-        printHelp()
-    }
-  }
-
-  return { timer, history }
-}
-
-// Create storage directory if it doesn't exist
-await mkdir(STORAGE_DIR, { recursive: true })
-
-// make sure we can write to NOTES_FILE without overwriting
-try {
-  await Bun.file(NOTES_FILE).text()
-} catch {
-  await Bun.write(NOTES_FILE, '')
-}
-
-await Bun.write(TEMP_FILE, '')
-
-try {
-  const { timer, history: historyCount } = parseArgs()
-
-  if (timer > 0 && process.platform === "darwin") {
-    setTimeout(() => {
-      spawn("osascript", ["-e", 'display notification "Time is almost up!" with title "Dumpy Timer"'])
-    }, (timer - 1) * 1000)
-  }
-
-  // Before starting vim, clean up any existing swap files
-  try {
-    unlinkSync("/tmp/.dumpy.txt.swp");
-  } catch {}
-
-
-  const vimProcess = spawn('vim', [
-    '-n',                     // No swap file
-    '+startinsert',          // Start in insert mode
-    '-c', `autocmd VimEnter * let timer = timer_start(${timer * 1000}, {-> execute(':wq')})`, // Auto save-quit after timer
-    TEMP_FILE
-  ], {
-    stdio: 'inherit'
+async function spawnCommand(cmd: string, args: string[] = []): Promise<number> {
+  const proc = spawn(cmd, args, { 
+    stdio: 'inherit',
+    env: process.env
   })
 
-  // Wait for vim to exit
-  const exitCode = await new Promise((resolve) => {
-    vimProcess.on('exit', (code) => {
-      try {
-        unlinkSync("/tmp/.dumpy.txt.swp");
-      } catch {}
-      resolve(code);
-    });
+  return new Promise((resolve) => {
+    proc.on('exit', (code) => resolve(code ?? 1))
+  })
+}
+
+async function getBinPath(): Promise<string> {
+  const proc = spawn('which', ['dumpy'], { stdio: 'pipe' })
+  
+  const output = await new Promise<string>((resolve) => {
+    let data = ''
+    proc.stdout?.on('data', chunk => data += chunk)
+    proc.on('close', () => resolve(data.trim()))
   })
 
-  if (exitCode === 0 || exitCode === null) {
-    const thought = await Bun.file(TEMP_FILE).text()
-    
-    if (thought.trim()) {
-      const entry = {
-        text: thought.trim(),
-        timestamp: new Date().toISOString()
-      }
-      
-      await appendFile(NOTES_FILE, JSON.stringify(entry) + '\n')
-      console.log('dumped!')
-      
-      // Call dumpy-history as a separate process
-      spawn(join(process.cwd(), 'dumpy-history'), [historyCount.toString()], {
-        stdio: 'inherit'
-      });
-    }
+  return join(output, '..')
+}
+
+async function main() {
+  const [cmd, ...args] = process.argv.slice(2)
+
+  if (!cmd || cmd === '-h' || cmd === '--help') {
+    console.log(HELP_TEXT)
+    process.exit(0)
   }
+
+  const binPath = await getBinPath()
+
+  switch (cmd) {
+    case 'write':
+    case 'w':
+      await spawnCommand(`${binPath}/write.dumpy`, args)
+      break
+
+    case 'read':
+    case 'r':
+      await spawnCommand(`${binPath}/read.dumpy`, args)
+      break
+
+    case 'think':
+    case 't':
+      await spawnCommand(`${binPath}/think.dumpy`, args)
+      break
+
+    default:
+      console.error(`Unknown command: ${cmd}`)
+      console.log(HELP_TEXT)
+      process.exit(1)
+  }
+}
+
+try {
+  await main()
 } catch (e) {
-    console.error('cancelled, ', e)
-} finally {
-    await Bun.write(TEMP_FILE, '')
+  console.error('Error:', e)
+  process.exit(1)
 }
