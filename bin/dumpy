@@ -9,7 +9,6 @@ import { join } from "node:path"
 import { mkdir } from "node:fs/promises"
 import { spawn } from "child_process";
 import { unlinkSync } from "fs";
-import { format } from 'date-fns';
 
 const STORAGE_DIR = join(homedir(), '.dumpy')
 const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
@@ -17,10 +16,6 @@ const TEMP_FILE = `/tmp/dumpy.txt`
 const DEFAULT_TIMER = 60 // 1 minute
 const DEFAULT_HISTORY_COUNT = 3
 
-type DumpyEntry = {
-  text: string;
-  timestamp: string;
-}
 
 type Args = {
   timer: number;
@@ -105,7 +100,7 @@ try {
 await Bun.write(TEMP_FILE, '')
 
 try {
-  const { timer, history } = parseArgs()
+  const { timer, history: historyCount } = parseArgs()
 
   if (timer > 0 && process.platform === "darwin") {
     setTimeout(() => {
@@ -148,26 +143,12 @@ try {
       }
       
       await appendFile(NOTES_FILE, JSON.stringify(entry) + '\n')
+      console.log('dumped!')
       
-      
-      // Show previous entries except most recent
-      try {
-        const entries = (await Bun.file(NOTES_FILE).text())
-          .trim()
-          .split('\n')
-          .map(line => JSON.parse(line) as DumpyEntry);
-
-        if (entries.length > 0) {
-          console.log('\nHistory:');
-          entries
-            .slice(-history)     // last n entries based on history flag
-            .forEach(entry => {
-              const date = format(new Date(entry.timestamp), 'MMM d, h:mm a');
-              console.log(`\n[${date}]`);
-              console.log(entry.text);
-            });
-        }
-      } catch {}
+      // Call dumpy-history as a separate process
+      spawn(join(process.cwd(), 'dumpy-history'), [historyCount.toString()], {
+        stdio: 'inherit'
+      });
     }
   }
 } catch (e) {

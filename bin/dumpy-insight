@@ -1,0 +1,36 @@
+#!/usr/bin/env bun
+
+/// <reference types="bun-types" />
+
+import { readFileSync } from "fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+const STORAGE_DIR = join(homedir(), '.dumpy')
+const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
+
+type DumpyEntry = {
+  text: string;
+  timestamp: string;
+}
+
+// Read entries
+const entries = readFileSync(NOTES_FILE, 'utf-8')
+  .trim()
+  .split('\n')
+  .map(line => JSON.parse(line) as DumpyEntry)
+  .map(entry => entry.text);
+
+// For now, just do simple analysis
+const summary = entries[entries.length - 1]?.split(/[.!?]/)?.shift()?.trim();
+
+console.log(`
+AI Analysis:
+-----------
+Your most recent thought was: "${summary || 'No entries found'}"
+
+This seems to be about personal reflection and growth.
+I notice themes of introspection in your writing.
+
+(This is a placeholder for actual LLM analysis)
+`); 

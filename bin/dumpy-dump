@@ -1,0 +1,152 @@
+#!/usr/bin/env bun
+
+/// <reference types="bun-types" />
+
+import { appendFile } from "node:fs/promises"
+import { homedir } from "node:os"
+import { join } from "node:path"
+import { mkdir } from "node:fs/promises"
+import { spawn, ChildProcess } from "child_process"
+import { unlinkSync } from "fs"
+
+// Types
+type DumpyEntry = {
+  text: string;
+  timestamp: string;
+}
+
+type VimOptions = {
+  timer: number;
+  startInsert?: boolean;
+  noSwap?: boolean;
+}
+
+type ExitCode = number | null;
+
+type DumpyArgs = {
+  timer?: number;
+  help?: boolean;
+}
+
+// Constants
+const STORAGE_DIR = join(homedir(), '.dumpy')
+const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
+const TEMP_FILE = `/tmp/dumpy.txt`
+const DEFAULT_TIMER = 60
+const HELP_TEXT = `
+Usage: dumpy-dump [timer]
+
+Options:
+  timer      Duration in seconds before auto-save (default: 60)
+  -h, --help Show this help message
+
+Examples:
+  dumpy-dump    Start with default 60s timer
+  dumpy-dump 30 Start with 30s timer
+  dumpy-dump 0  Start with no timer
+`
+
+// Helper functions
+async function startVim({ timer, startInsert = true, noSwap = true }: VimOptions): Promise<ChildProcess> {
+  const args: string[] = []
+  if (noSwap) args.push('-n')
+  if (startInsert) args.push('+startinsert')
+  if (timer > 0) {
+    args.push('-c', `autocmd VimEnter * let timer = timer_start(${timer * 1000}, {-> execute(':wq')}) | autocmd BufWritePost * call timer_stop(timer)`)
+  }
+  args.push(TEMP_FILE)
+
+  return spawn('vim', args, { stdio: 'inherit' })
+}
+
+async function saveEntry(text: string): Promise<void> {
+  const entry: DumpyEntry = {
+    text: text.trim(),
+    timestamp: new Date().toISOString()
+  }
+  await appendFile(NOTES_FILE, JSON.stringify(entry) + '\n')
+}
+
+// Main logic
+async function main() {
+  const args = parseArgs()
+  if (args.help) {
+    console.log(HELP_TEXT)
+    process.exit(0)
+  }
+
+  const timer = args.timer ?? DEFAULT_TIMER
+
+  await mkdir(STORAGE_DIR, { recursive: true })
+  await Bun.write(TEMP_FILE, '')
+
+  try {
+    unlinkSync("/tmp/.dumpy.txt.swp")
+  } catch {}
+
+  if (timer > 0 && process.platform === "darwin") {
+    setTimeout(() => {
+      spawn("osascript", [
+        "-e",
+        'display notification "Time is almost up!" with title "Dumpy Timer"'
+      ])
+    }, (timer - 1) * 1000)
+  }
+
+  const vimProcess = await startVim({ timer })
+  
+  const exitCode: ExitCode = await new Promise((resolve) => {
+    vimProcess.on('exit', (code) => {
+      try {
+        unlinkSync("/tmp/.dumpy.txt.swp")
+      } catch {}
+      resolve(code)
+    })
+
+    process.on('SIGINT', () => {
+      vimProcess.kill()
+      resolve(1)
+    })
+  })
+
+  const thought = await Bun.file(TEMP_FILE).text()
+  if (thought.trim()) {
+    console.log(thought.trim())
+    if (exitCode === 0 || exitCode === null) {
+      await saveEntry(thought)
+    } else {
+      console.log('\nNot saved - exited vim without saving')
+    }
+  }
+
+  process.exit(0)
+}
+
+function parseArgs(): DumpyArgs {
+  const args: DumpyArgs = {}
+  
+  if (process.argv.includes('-h') || process.argv.includes('--help')) {
+    args.help = true
+    return args
+  }
+
+  const timerArg = process.argv[2]
+  if (timerArg) {
+    const parsed = parseInt(timerArg)
+    if (isNaN(parsed)) {
+      console.error('Error: Timer must be a number')
+      process.exit(1)
+    }
+    args.timer = parsed
+  }
+
+  return args
+}
+
+try {
+  await main()
+} catch (e) {
+  console.error('Error:', e)
+} finally {
+  await Bun.write(TEMP_FILE, '')
+}
