@@ -5,6 +5,7 @@
 import { spawn } from "child_process"
 import { join } from "path"
 import { access, constants } from "fs/promises"
+import { $ } from "bun"
 
 const HELP_TEXT = `
 Usage: dumpy <command> [options]
@@ -58,6 +59,43 @@ async function isExecutable(path: string): Promise<boolean> {
   }
 }
 
+type PipeOptions = {
+  input?: string;
+  args?: string[];
+}
+
+async function pipeCommands(commands: string[], options: PipeOptions = {}): Promise<string> {
+  const binPath = await getBinPath()
+
+  const cmdString = [...commands]
+    .map(cmd => {
+      const binary = cmdMap[cmd as keyof typeof cmdMap]
+      if (!binary) throw new Error(`Unknown command: ${cmd}`)
+      return join(binPath, binary)
+    })
+    .join(' | ')
+
+  const proc = Bun.spawn(['sh', '-c', cmdString], {
+    stdout: 'pipe',
+    stderr: 'inherit',
+    env: process.env
+  })
+  
+  const output = await new Response(proc.stdout).text()
+  console.log(`piping commands: ${cmdString} output: ${output}`)
+
+  return output
+}
+
+const cmdMap = {
+  'write': 'dumpy-write',
+  'w': 'dumpy-write',
+  'read': 'dumpy-read',
+  'r': 'dumpy-read',
+  'think': 'dumpy-think',
+  't': 'dumpy-think'
+} as const
+
 async function main() {
   const [cmd, ...args] = process.argv.slice(2)
 
@@ -66,15 +104,27 @@ async function main() {
     process.exit(0)
   }
 
+  // Handle piping for think command
+  if (cmd === 'think' || cmd === 't') {
+    try {
+      console.log('reading...')
+      console.log('thinking...')
+      const output = await pipeCommands(['read', 'think'], { args })
+
+      // Use Response as stdin.
+      await $`echo ${output} | glow -`
+
+      
+      process.exit(0)
+    } catch (e) {
+      console.error('Error:', e)
+      process.exit(1)
+    }
+  }
+
+  // Normal command execution
   const binPath = await getBinPath()
-  const cmdMap = {
-    'write': 'dumpy-write',
-    'w': 'dumpy-write',
-    'read': 'dumpy-read',
-    'r': 'dumpy-read',
-    'think': 'dumpy-think',
-    't': 'dumpy-think'
-  } as const
+
 
   const binary = cmdMap[cmd as keyof typeof cmdMap]
   if (!binary) {
