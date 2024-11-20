@@ -1,7 +1,7 @@
 class Dumpy < Formula
   desc "Quick terminal journaling tool"
   homepage "https://github.com/eden-chan/homebrew-dumpy"
-  url "https://github.com/eden-chan/homebrew-dumpy/archive/refs/tags/v0.1.3.tar.gz"
+  url "https://github.com/eden-chan/homebrew-dumpy/archive/refs/tags/v0.1.4.tar.gz"
   sha256 "3dc6f6329f8badc8e2ad4f9b7e2f219b3bc9feb3c5ff9c83ee3b13c082067681"
   license "MIT"
   depends_on "bun"
@@ -9,11 +9,9 @@ class Dumpy < Formula
   def install
     bin.mkpath
     bin.install "bin/dumpy"
-    bin.install Dir["bin/*.dumpy"]  # Install utility scripts to bin
+    bin.install Dir["bin/*.dumpy"]
     
-    # Install remaining files from the project
-    prefix.install Dir["*"]
-    # Ensure all scripts are executable
+    # Make everything executable
     chmod 0755, Dir[bin/"*.dumpy"]
     chmod 0755, bin/"dumpy"
   end

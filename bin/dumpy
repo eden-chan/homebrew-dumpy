@@ -4,14 +4,15 @@
 
 import { spawn } from "child_process"
 import { join } from "path"
+import { access, constants } from "fs/promises"
 
 const HELP_TEXT = `
 Usage: dumpy <command> [options]
 
 Commands:
-  write, w   Write a new thought (dumpy-dump)
-  read, r    Read your thoughts (dumpy-history)
-  think, t   Get insights about your thoughts (dumpy-insight)
+  write, w   Write a new thought (dumpy-write)
+  read, r    Read your thoughts (dumpy-read)
+  think, t   Get insights about your thoughts (dumpy-think)
 
 Examples:
   dumpy write 30    Write with 30s timer
@@ -31,15 +32,30 @@ async function spawnCommand(cmd: string, args: string[] = []): Promise<number> {
 }
 
 async function getBinPath(): Promise<string> {
-  const proc = spawn('brew', ['--prefix', 'dumpy'], { stdio: 'pipe' })
-  
-  const output = await new Promise<string>((resolve) => {
-    let data = ''
-    proc.stdout?.on('data', chunk => data += chunk)
-    proc.on('close', () => resolve(data.trim()))
-  })
+  const possiblePaths = [
+    process.env.HOMEBREW_PREFIX && join(process.env.HOMEBREW_PREFIX, 'opt', 'dumpy', 'bin'),
+    '/opt/homebrew/opt/dumpy/bin',
+    '/usr/local/opt/dumpy/bin',
+    join(process.cwd(), 'bin')
+  ].filter(Boolean) as string[]
 
-  return join(output, 'bin')
+  for (const binPath of possiblePaths) {
+    try {
+      await access(binPath, constants.F_OK)
+      return binPath
+    } catch {}
+  }
+
+  throw new Error('Binary directory not found')
+}
+
+async function isExecutable(path: string): Promise<boolean> {
+  try {
+    await access(path, constants.F_OK | constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function main() {
@@ -51,28 +67,30 @@ async function main() {
   }
 
   const binPath = await getBinPath()
+  const cmdMap = {
+    'write': 'dumpy-write',
+    'w': 'dumpy-write',
+    'read': 'dumpy-read',
+    'r': 'dumpy-read',
+    'think': 'dumpy-think',
+    't': 'dumpy-think'
+  } as const
 
-  switch (cmd) {
-    case 'write':
-    case 'w':
-      await spawnCommand(`${binPath}/write.dumpy`, args)
-      break
-
-    case 'read':
-    case 'r':
-      await spawnCommand(`${binPath}/read.dumpy`, args)
-      break
-
-    case 'think':
-    case 't':
-      await spawnCommand(`${binPath}/think.dumpy`, args)
-      break
-
-    default:
-      console.error(`Unknown command: ${cmd}`)
-      console.log(HELP_TEXT)
-      process.exit(1)
+  const binary = cmdMap[cmd as keyof typeof cmdMap]
+  if (!binary) {
+    console.error(`Unknown command: ${cmd}`)
+    console.log(HELP_TEXT)
+    process.exit(1)
   }
+
+  const fullPath = join(binPath, binary)
+  if (!await isExecutable(fullPath)) {
+    console.error(`Command not found: ${cmd}`)
+    process.exit(1)
+  }
+
+  const exitCode = await spawnCommand(fullPath, args)
+  process.exit(exitCode)
 }
 
 try {
