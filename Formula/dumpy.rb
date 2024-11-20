@@ -5,6 +5,7 @@ class Dumpy < Formula
   sha256 "b7a1e9597ec6d529572c4310644b39fe42e610418ef517b0f283f965b9d12abe"
   license "MIT"
   depends_on "bun"
+  depends_on "glow" # markdown viewer
 
   def install
     bin.mkpath
