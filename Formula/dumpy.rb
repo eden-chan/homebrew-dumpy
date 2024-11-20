@@ -2,7 +2,7 @@ class Dumpy < Formula
   desc "Quick terminal journaling tool"
   homepage "https://github.com/eden-chan/homebrew-dumpy"
   url "https://github.com/eden-chan/homebrew-dumpy/archive/refs/tags/v0.1.6.tar.gz"
-  sha256 "dc7b37f04627af9889b4d14111096b3b6e80ddd6f1ea8a43f430ab9d51fd8fcd"
+  sha256 "d5558cd419c8d46bdc958064cb97f963d1ea793866414c025906ec15033512ed"
   license "MIT"
   depends_on "bun"
   depends_on "glow" # markdown viewer
