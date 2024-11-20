@@ -9,11 +9,88 @@ import { join } from "node:path"
 import { mkdir } from "node:fs/promises"
 import { spawn } from "child_process";
 import { unlinkSync } from "fs";
+import { format } from 'date-fns';
 
 const STORAGE_DIR = join(homedir(), '.dumpy')
 const NOTES_FILE = join(STORAGE_DIR, 'thoughts.dumpy')
 const TEMP_FILE = `/tmp/dumpy.txt`
 const DEFAULT_TIMER = 60 // 1 minute
+const DEFAULT_HISTORY_COUNT = 3
+
+type DumpyEntry = {
+  text: string;
+  timestamp: string;
+}
+
+type Args = {
+  timer: number;
+  history: number;
+}
+
+function printHelp() {
+  console.log(`
+Usage: dumpy [options] or dumpy <seconds>
+
+Options:
+  -t, --timer <seconds>   Set timer duration (default: ${DEFAULT_TIMER}s)
+  -n, --history <number>  Number of history entries to show (default: 1)
+  -h, --help             Show this help message
+
+Examples:
+  dumpy                  Start with default 60s timer
+  dumpy 30              Start with 30s timer
+  dumpy -t 30           Start with 30s timer
+  dumpy --timer 120     Start with 2min timer
+  dumpy -n 5            Show last 5 history entries
+`)
+  process.exit(0)
+}
+
+function parseArgs(): Args {
+  const args = process.argv.slice(2)
+  let timer = DEFAULT_TIMER
+  let history = DEFAULT_HISTORY_COUNT
+
+  if (args.length === 0) return { timer, history }
+
+  // If first arg is a number, treat it as timer value
+  if (!isNaN(Number(args[0]))) {
+    timer = Number(args[0])
+    return { timer, history }
+  }
+
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case '-h':
+      case '--help':
+        printHelp()
+        break
+      case '-t':
+      case '--timer':
+        const tValue = args[++i]
+        if (!tValue || isNaN(Number(tValue))) {
+          console.error('Error: Timer value must be a number in seconds')
+          printHelp()
+        }
+        timer = Number(tValue)
+        break
+      case '-n':
+      case '--history':
+        const hValue = args[++i]
+        if (!hValue || isNaN(Number(hValue))) {
+          console.error('Error: History value must be a number')
+          printHelp()
+        }
+        history = Number(hValue)
+        break
+      default:
+        console.error(`Error: Unknown option ${args[i]}`)
+        printHelp()
+    }
+  }
+
+  return { timer, history }
+}
 
 // Create storage directory if it doesn't exist
 await mkdir(STORAGE_DIR, { recursive: true })
@@ -28,7 +105,7 @@ try {
 await Bun.write(TEMP_FILE, '')
 
 try {
-  const timer = process.argv[2] ? parseInt(process.argv[2]) : DEFAULT_TIMER
+  const { timer, history } = parseArgs()
 
   if (timer > 0 && process.platform === "darwin") {
     setTimeout(() => {
@@ -71,7 +148,26 @@ try {
       }
       
       await appendFile(NOTES_FILE, JSON.stringify(entry) + '\n')
-      console.log('dumped!')
+      
+      
+      // Show previous entries except most recent
+      try {
+        const entries = (await Bun.file(NOTES_FILE).text())
+          .trim()
+          .split('\n')
+          .map(line => JSON.parse(line) as DumpyEntry);
+
+        if (entries.length > 0) {
+          console.log('\nHistory:');
+          entries
+            .slice(-history)     // last n entries based on history flag
+            .forEach(entry => {
+              const date = format(new Date(entry.timestamp), 'MMM d, h:mm a');
+              console.log(`\n[${date}]`);
+              console.log(entry.text);
+            });
+        }
+      } catch {}
     }
   }
 } catch (e) {
