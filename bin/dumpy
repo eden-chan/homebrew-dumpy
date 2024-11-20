@@ -6,6 +6,7 @@ import { spawn } from "child_process"
 import { join } from "path"
 import { access, constants } from "fs/promises"
 import { $ } from "bun"
+import { $ } from "bun"
 
 const HELP_TEXT = `
 Usage: dumpy <command> [options]
