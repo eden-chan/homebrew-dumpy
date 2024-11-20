@@ -31,7 +31,7 @@ async function spawnCommand(cmd: string, args: string[] = []): Promise<number> {
 }
 
 async function getBinPath(): Promise<string> {
-  const proc = spawn('which', ['dumpy'], { stdio: 'pipe' })
+  const proc = spawn('brew', ['--prefix', 'dumpy'], { stdio: 'pipe' })
   
   const output = await new Promise<string>((resolve) => {
     let data = ''
@@ -39,7 +39,7 @@ async function getBinPath(): Promise<string> {
     proc.on('close', () => resolve(data.trim()))
   })
 
-  return join(output, '..')
+  return join(output, 'bin')
 }
 
 async function main() {

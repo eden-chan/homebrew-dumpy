@@ -9,6 +9,13 @@ class Dumpy < Formula
   def install
     bin.mkpath
     bin.install "bin/dumpy"
+    bin.install Dir["bin/*.dumpy"]  # Install utility scripts to bin
+    
+    # Install remaining files from the project
+    prefix.install Dir["*"]
+    # Ensure all scripts are executable
+    chmod 0755, Dir[bin/"*.dumpy"]
+    chmod 0755, bin/"dumpy"
   end
 
   test do
